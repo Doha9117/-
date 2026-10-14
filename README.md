@@ -33,7 +33,7 @@ python3 gacha_sim.py --csv results.csv   # 플레이어별 결과 저장
 python3 -m unittest test_gacha_sim       # 테스트
 ```
 
-`index.html`을 브라우저로 열면 두 뽑기 기계를 직접 돌려 보고, 같은 모델로 집단 시뮬레이션 결과(지표 표, 지출 분포)를 볼 수 있습니다.
+웹 버전은 `docs/gacha/index.html`입니다. 브라우저로 열거나, GitHub Pages(아래 "2. 웹사이트" 참고)를 켜면 `https://<GitHub 아이디>.github.io/<저장소 이름>/gacha/`에서 두 뽑기 기계를 직접 돌려 보고, 같은 모델로 집단 시뮬레이션 결과(지표 표, 지출 분포)를 볼 수 있습니다. 서버나 설치 없이 파일 하나로 동작합니다.
 
 ## 기본 설정 결과 (20,000명)
 
