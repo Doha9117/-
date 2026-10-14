@@ -1,0 +1,510 @@
+<title>천장 뽑기 비교 실험</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 실험 기록지. 같은 기계 두 대(A·B)를 나란히 놓고, 아래에 집단 시뮬레이션 결과를 같은 축으로 비교 */
+:root {
+  --bg: #eef1f4;
+  --paper: #ffffff;
+  --ink: #18212b;
+  --ink-2: #4a5663;
+  --ink-3: #7b8794;
+  --line: #d5dce3;
+  --a: #2a78d6;      /* A 손익분기점 명시 */
+  --b: #eb6834;      /* B 미명시 */
+  --gold: #c98a00;   /* 픽업 획득 */
+  --gold-bg: #fff3d1;
+  --off: #6250d6;    /* 픽뚫 */
+  --off-bg: #ece9fb;
+  --cell: #e3e8ed;
+  --good: #1a7f4b;
+  --bad: #c2362b;
+  --f-display: "Black Han Sans", "Noto Sans KR", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans KR", "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171d; --paper: #1a2129; --ink: #e8edf2; --ink-2: #b3bec9; --ink-3: #85919d; --line: #2e3842;
+    --a: #3987e5; --b: #d95926; --gold: #e0a823; --gold-bg: #3a2f12; --off: #9085e9; --off-bg: #2a2547;
+    --cell: #26303a; --good: #3fbf7f; --bad: #ef6b5f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171d; --paper: #1a2129; --ink: #e8edf2; --ink-2: #b3bec9; --ink-3: #85919d; --line: #2e3842;
+  --a: #3987e5; --b: #d95926; --gold: #e0a823; --gold-bg: #3a2f12; --off: #9085e9; --off-bg: #2a2547;
+  --cell: #26303a; --good: #3fbf7f; --bad: #ef6b5f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--f-display); font-weight: 400; text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: clamp(28px, 4.6vw, 42px); line-height: 1.15; }
+h2 { font-size: 22px; }
+h3 { font-size: 15px; margin: 0; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--ink-2); }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+header { display: grid; gap: 10px; }
+
+/* 공통 설정 */
+.params { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: end; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+.params label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); }
+.params input { width: 120px; font: 500 14px var(--f-mono); padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+.params .derived { font-size: 13px; color: var(--ink-2); flex: 1 1 260px; min-width: 0; }
+.params .derived b { color: var(--ink); font-family: var(--f-mono); font-weight: 600; }
+
+/* 기계 두 대 */
+.machines { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.machine { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: grid; gap: 14px; align-content: start; min-width: 0; border-top: 4px solid var(--tone); }
+.machine.a { --tone: var(--a); }
+.machine.b { --tone: var(--b); }
+.mhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tag { font: 600 12px var(--f-mono); color: var(--tone); letter-spacing: .06em; }
+.big { font: 600 30px var(--f-mono); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sub { font-size: 13px; color: var(--ink-2); }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.stat { display: grid; gap: 2px; }
+.stat .k { font-size: 12px; color: var(--ink-3); }
+.stat .v { font: 600 16px var(--f-mono); font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; width: fit-content; }
+.pill.ok { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.pill.over { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.pill.near { background: var(--gold-bg); color: var(--gold); }
+
+/* 지출 눈금자 (A 전용) */
+.ruler { position: relative; height: 54px; margin-top: 4px; }
+.ruler .track { position: absolute; left: 0; right: 0; top: 18px; height: 10px; background: var(--cell); border-radius: 5px; overflow: hidden; }
+.ruler .fill { height: 100%; width: 0; background: var(--a); border-radius: 5px; transition: width .25s ease; }
+.ruler .mark { position: absolute; top: 12px; width: 2px; height: 22px; background: var(--ink); transform: translateX(-1px); }
+.ruler .mark.be { background: var(--bad); }
+.ruler .mark.ex { background: var(--ink-3); }
+.ruler .mlabel { position: absolute; top: 36px; font-size: 11px; white-space: nowrap; color: var(--ink-2); transform: translateX(-50%); }
+.ruler .mlabel.be { color: var(--bad); font-weight: 700; top: -4px; }
+.ruler .mlabel.right { transform: translateX(-100%); }
+.ruler .mlabel.left { transform: none; }
+
+.pitybar { display: grid; grid-template-columns: repeat(90, 1fr); gap: 1px; height: 12px; }
+.pitybar i { background: var(--cell); border-radius: 1px; }
+.pitybar i.on { background: var(--tone); }
+.pitybar i.soft { box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--gold) 70%, transparent); }
+
+.hidden-note { font-size: 13px; color: var(--ink-3); padding: 10px 12px; border: 1px dashed var(--line); border-radius: 4px; }
+
+.log { display: flex; flex-wrap: wrap; gap: 3px; min-height: 22px; }
+.log span { width: 16px; height: 16px; border-radius: 3px; background: var(--cell); }
+.log span.featured { background: var(--gold); }
+.log span.off { background: var(--off); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.events { display: grid; gap: 4px; font-size: 13px; max-height: 120px; overflow-y: auto; }
+.events div { display: flex; gap: 8px; }
+.events .n { font-family: var(--f-mono); color: var(--ink-3); min-width: 52px; }
+.events .featured { color: var(--gold); font-weight: 700; }
+.events .off { color: var(--off); font-weight: 700; }
+
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: 600 14px var(--f-body); padding: 9px 14px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--tone, var(--ink)); border-color: transparent; color: #fff; }
+button:hover { filter: brightness(1.06); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.both { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.both p { font-size: 13px; color: var(--ink-3); }
+
+/* 집단 시뮬레이션 */
+section.sim { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 20px; display: grid; gap: 18px; min-width: 0; }
+.simhead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: end; }
+.behav { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.behav > div { display: block; font-size: 13.5px; color: var(--ink-2); padding-left: 12px; border-left: 3px solid var(--tone); }
+.behav .a { --tone: var(--a); } .behav .b { --tone: var(--b); }
+.behav b { color: var(--ink); display: block; margin-bottom: 4px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+thead th.a { color: var(--a); } thead th.b { color: var(--b); }
+td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--f-body); }
+td.diff.up { color: var(--bad); } td.diff.down { color: var(--good); }
+.charts { display: grid; gap: 14px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .ttl { font-size: 13px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+.chart .ttl i { width: 10px; height: 10px; border-radius: 2px; background: var(--tone); }
+.chart.a { --tone: var(--a); } .chart.b { --tone: var(--b); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--paper); font-size: 12px; padding: 6px 8px; border-radius: 4px; white-space: nowrap; transform: translate(-50%, -110%); }
+.findings { display: grid; gap: 6px; font-size: 14px; }
+.findings li { max-width: 72ch; }
+.findings ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+footer { font-size: 12.5px; color: var(--ink-3); }
+@media (prefers-reduced-motion: reduce) { .ruler .fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">천장 시스템 · 정보 공개 비교</div>
+    <h1>같은 확률, 다른 화면</h1>
+    <p class="lede">두 뽑기 기계는 확률과 천장 규칙이 완전히 같습니다. A는 지출 금액과 손익분기점을 보여주고, B는 재화(원석) 사용량만 보여줍니다. 직접 뽑아 보고, 아래에서 플레이어 수천 명의 행동을 시뮬레이션해 비교해 보세요.</p>
+  </header>
+
+  <div class="params" role="group" aria-label="공통 설정">
+    <label for="pValue">캐릭터 가치(원)<input id="pValue" type="number" step="10000" min="10000" value="200000"></label>
+    <label for="pCost">1회 가격(원)<input id="pCost" type="number" step="100" min="100" value="3000"></label>
+    <label for="pSeed">난수 시드<input id="pSeed" type="number" step="1" value="42"></label>
+    <div class="derived" id="derived"></div>
+  </div>
+
+  <div class="machines">
+    <article class="machine a" aria-labelledby="ta">
+      <div class="mhead"><h2 id="ta">A · 손익분기점 명시</h2><span class="tag">INFORMED</span></div>
+      <div>
+        <div class="big" id="aSpent">₩0</div>
+        <div class="sub" id="aSpentSub">누적 지출</div>
+      </div>
+      <span class="pill ok" id="aState">손익분기점까지 67회</span>
+      <div class="ruler" id="aRuler" aria-hidden="true">
+        <div class="track"><div class="fill" id="aFill"></div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="k">천장 카운트</span><span class="v" id="aPity">0 / 90</span></div>
+        <div class="stat"><span class="k">다음 1회 확률</span><span class="v" id="aRate">0.6%</span></div>
+        <div class="stat"><span class="k">픽업 기대 잔여 비용</span><span class="v" id="aRemain">-</span></div>
+        <div class="stat"><span class="k">다음 최고등급</span><span class="v" id="aGuar">50/50</span></div>
+      </div>
+      <div class="pitybar" id="aPityBar" aria-hidden="true"></div>
+      <div class="log" id="aLog" aria-label="최근 뽑기 결과"></div>
+      <div class="events" id="aEvents"></div>
+      <div class="btns">
+        <button class="primary" id="aPull1">1회 뽑기</button>
+        <button class="primary" id="aPull10">10회 뽑기</button>
+        <button id="aReset">초기화</button>
+      </div>
+    </article>
+
+    <article class="machine b" aria-labelledby="tb">
+      <div class="mhead"><h2 id="tb">B · 손익분기점 미명시</h2><span class="tag">HIDDEN</span></div>
+      <div>
+        <div class="big" id="bGems">0 원석</div>
+        <div class="sub">사용한 재화 (1회 = 160 원석)</div>
+      </div>
+      <div class="hidden-note">금액, 천장 카운트, 손익분기점은 표시되지 않습니다. 천장은 A와 똑같이 작동합니다.</div>
+      <div class="stats">
+        <div class="stat"><span class="k">뽑은 횟수</span><span class="v" id="bPulls">0회</span></div>
+        <div class="stat"><span class="k">획득한 픽업</span><span class="v" id="bGot">0</span></div>
+      </div>
+      <div class="log" id="bLog" aria-label="최근 뽑기 결과"></div>
+      <div class="events" id="bEvents"></div>
+      <div class="btns">
+        <button class="primary" id="bPull1">1회 뽑기</button>
+        <button class="primary" id="bPull10">10회 뽑기</button>
+        <button id="bReset">초기화</button>
+      </div>
+    </article>
+  </div>
+
+  <div class="both">
+    <button id="bothPull10">양쪽 동시에 10회</button>
+    <button id="bothReset">양쪽 초기화</button>
+    <div class="legend"><span><i style="background:var(--gold)"></i>픽업 획득</span><span><i style="background:var(--off)"></i>픽뚫(다음 확정)</span><span><i style="background:var(--cell)"></i>일반</span></div>
+    <p>두 기계는 같은 시드를 쓰므로 같은 횟수를 뽑으면 결과도 같습니다. 달라지는 건 화면뿐입니다.</p>
+  </div>
+
+  <section class="sim" aria-labelledby="ts">
+    <div class="simhead">
+      <div style="display:grid;gap:6px">
+        <div class="eyebrow">몬테카를로 · 같은 플레이어, 같은 난수</div>
+        <h2 id="ts">플레이어 집단 시뮬레이션</h2>
+      </div>
+      <div class="params" style="padding:10px 12px">
+        <label for="sN">플레이어 수<input id="sN" type="number" min="500" step="500" value="10000"></label>
+        <label for="sPerceive">B 지출 인식 계수<input id="sPerceive" type="number" min="0.1" max="1.5" step="0.05" value="0.7"></label>
+        <label for="sSunk">B 매몰비용 계수<input id="sSunk" type="number" min="0" max="3" step="0.1" value="0.6"></label>
+        <button id="runSim" style="--tone:var(--ink)" class="primary">다시 실행</button>
+      </div>
+    </div>
+
+    <div class="behav">
+      <div class="a"><b>A 플레이어</b>심리적 예산(중앙값 = 캐릭터 가치)과 손익분기점 중 낮은 쪽을 넘기 직전에 멈춥니다. 단, 기대 잔여 비용이 가치의 25% 이하면 천장을 마저 채웁니다.</div>
+      <div class="b"><b>B 플레이어</b>같은 예산을 갖지만 금액이 원석으로 가려져 지출을 <span id="perceiveTxt">70%</span>로 인식합니다. 많이 뽑을수록 "여기까지 왔는데" 하며 한도가 늘어납니다(90회마다 +<span id="sunkTxt">60%</span>).</div>
+    </div>
+
+    <div class="tablewrap"><table id="simTable" aria-label="A와 B 비교 지표"></table></div>
+
+    <div class="charts" id="charts"></div>
+
+    <div class="findings" id="findings"></div>
+  </section>
+
+  <footer>천장 규칙: 기본 0.6%, 74회부터 회당 +6%p, 90회 확정. 최고등급 중 픽업 50%, 실패 시 다음 최고등급은 픽업 확정. 행동 규칙은 가정이며 위 계수로 바꿀 수 있습니다. 같은 모델의 Python 버전은 저장소의 gacha_sim.py에 있습니다.</footer>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ---------- 천장 시스템 (두 버전 공통) ----------
+const CFG = { base: 0.006, softStart: 74, softStep: 0.06, hard: 90, featured: 0.5, guarantee: true, gems: 160 };
+const rate = k => k >= CFG.hard ? 1 : k >= CFG.softStart ? Math.min(1, CFG.base + (k - CFG.softStart + 1) * CFG.softStep) : CFG.base;
+
+function mulberry32(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+class Banner {
+  constructor(rng) { this.rng = rng; this.pity = 0; this.guaranteed = false; this.pulls = 0; }
+  pull() {
+    this.pulls++; this.pity++;
+    if (this.rng() < rate(this.pity)) {
+      this.pity = 0;
+      if (this.guaranteed || this.rng() < CFG.featured) { this.guaranteed = false; return "featured"; }
+      this.guaranteed = CFG.guarantee; return "off";
+    }
+    return "common";
+  }
+}
+
+// 천장 카운트 k에서 픽업까지 기대 잔여 횟수 [확정 아님, 확정]
+function expectedTable() {
+  const h = CFG.hard, f = new Array(h + 1).fill(0);
+  for (let k = h - 1; k >= 0; k--) f[k] = 1 + (1 - rate(k + 1)) * f[k + 1];
+  const miss = CFG.guarantee ? f[0] : f[0] / CFG.featured;
+  return [f.slice(0, h).map(x => x + (1 - CFG.featured) * miss), f.slice(0, h)];
+}
+const E = expectedTable();
+
+// ---------- 화면 공통 ----------
+const $ = id => document.getElementById(id);
+const won = x => (x < 0 ? "−₩" : "₩") + Math.abs(Math.round(x)).toLocaleString("ko-KR");
+const params = () => ({
+  value: Math.max(10000, +$("pValue").value || 200000),
+  cost: Math.max(100, +$("pCost").value || 3000),
+  seed: Math.trunc(+$("pSeed").value || 0)
+});
+
+function renderDerived() {
+  const p = params(), be = p.value / p.cost, maxP = CFG.hard * 2;
+  $("derived").innerHTML = `손익분기점 <b>${be.toFixed(1)}회</b> · 픽업 기대 비용 <b>${won(E[0][0] * p.cost)}</b> (${E[0][0].toFixed(1)}회) · 최악 <b>${won(maxP * p.cost)}</b> (${maxP}회)`;
+}
+
+// ---------- 기계 ----------
+function makeMachine(key) {
+  const m = { key, banner: null, log: [], events: [], got: 0 };
+  m.reset = () => { m.banner = new Banner(mulberry32(params().seed)); m.log = []; m.events = []; m.got = 0; m.render(); };
+  m.pull = n => {
+    for (let i = 0; i < n; i++) {
+      const r = m.banner.pull();
+      m.log.push(r);
+      if (r !== "common") m.events.unshift({ n: m.banner.pulls, r });
+      if (r === "featured") m.got++;
+    }
+    m.render();
+  };
+  m.render = () => (key === "a" ? renderA : renderB)(m);
+  return m;
+}
+
+function renderLog(el, log) {
+  el.innerHTML = log.slice(-60).map(r => `<span class="${r}" title="${r === "featured" ? "픽업" : r === "off" ? "픽뚫" : "일반"}"></span>`).join("");
+}
+function renderEvents(el, events, p, showMoney) {
+  el.innerHTML = events.length ? events.map(e =>
+    `<div><span class="n">${e.n}회째</span><span class="${e.r}">${e.r === "featured" ? "픽업 획득" : "픽뚫 · 다음은 확정"}</span>${showMoney ? `<span class="num" style="color:var(--ink-3)">${won(e.n * p.cost)}</span>` : ""}</div>`).join("")
+    : `<div style="color:var(--ink-3)">아직 최고등급이 나오지 않았습니다.</div>`;
+}
+
+const pityBars = {};
+function buildPityBar(id) {
+  const el = $(id);
+  el.innerHTML = Array.from({ length: CFG.hard }, (_, i) => `<i class="${i + 1 >= CFG.softStart ? "soft" : ""}"></i>`).join("");
+  pityBars[id] = [...el.children];
+}
+
+function renderA(m) {
+  const p = params(), b = m.banner, spent = b.pulls * p.cost, beSpend = p.value;
+  const scaleMax = Math.max(CFG.hard * 2 * p.cost, spent, beSpend);
+  $("aSpent").textContent = won(spent);
+  $("aSpentSub").textContent = `누적 지출 · ${b.pulls}회 · 획득 ${m.got}`;
+  const remain = (b.guaranteed ? E[1] : E[0])[b.pity] * p.cost;
+  const toBe = Math.ceil((beSpend - spent) / p.cost);
+  const st = $("aState");
+  if (spent > beSpend) { st.className = "pill over"; st.textContent = `손익분기점 ${won(spent - beSpend)} 초과`; }
+  else if (toBe <= 10) { st.className = "pill near"; st.textContent = `손익분기점까지 ${toBe}회`; }
+  else { st.className = "pill ok"; st.textContent = `손익분기점까지 ${toBe}회`; }
+  $("aPity").textContent = `${b.pity} / ${CFG.hard}`;
+  $("aRate").textContent = (rate(b.pity + 1) * 100).toFixed(1) + "%";
+  $("aRemain").textContent = won(remain);
+  $("aGuar").textContent = b.guaranteed ? "픽업 확정" : "50/50";
+  $("aFill").style.width = Math.min(100, spent / scaleMax * 100) + "%";
+  // 눈금: 손익분기점, 현재 기준 기대 총비용, 최악
+  const ruler = $("aRuler");
+  ruler.querySelectorAll(".mark,.mlabel").forEach(e => e.remove());
+  const marks = [
+    { v: beSpend, cls: "be", text: `손익분기점 ${won(beSpend)}` },
+    { v: spent + remain, cls: "ex", text: `예상 총비용 ${won(spent + remain)}` },
+    { v: CFG.hard * 2 * p.cost, cls: "", text: `최악 ${won(CFG.hard * 2 * p.cost)}` }
+  ];
+  for (const mk of marks) {
+    const x = Math.min(100, mk.v / scaleMax * 100);
+    ruler.insertAdjacentHTML("beforeend", `<div class="mark ${mk.cls}" style="left:${x}%"></div><div class="mlabel ${mk.cls} ${x > 80 ? "right" : x < 15 ? "left" : ""}" style="left:${x}%">${mk.text}</div>`);
+  }
+  pityBars.aPityBar.forEach((c, i) => c.classList.toggle("on", i < b.pity));
+  renderLog($("aLog"), m.log);
+  renderEvents($("aEvents"), m.events, p, true);
+}
+
+function renderB(m) {
+  const b = m.banner;
+  $("bGems").textContent = (b.pulls * CFG.gems).toLocaleString("ko-KR") + " 원석";
+  $("bPulls").textContent = b.pulls + "회";
+  $("bGot").textContent = m.got;
+  renderLog($("bLog"), m.log);
+  renderEvents($("bEvents"), m.events, params(), false);
+}
+
+// ---------- 플레이어 행동 모델 ----------
+function gauss(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function wantsNext(version, b, p, beh, budget) {
+  const nextSpent = (b.pulls + 1) * p.cost;
+  if (version === "A") {
+    const remaining = (b.guaranteed ? E[1] : E[0])[b.pity] * p.cost;
+    return nextSpent <= Math.min(budget, p.value) || remaining <= beh.finish * p.value;
+  }
+  return nextSpent * beh.perceive <= budget * (1 + beh.sunk * b.pulls / CFG.hard);
+}
+
+function play(version, p, beh, budget, rng) {
+  const b = new Banner(rng); let r = "common";
+  while (wantsNext(version, b, p, beh, budget)) { r = b.pull(); if (r === "featured") break; }
+  const spent = b.pulls * p.cost, got = r === "featured";
+  return { spent, got, pulls: b.pulls, budget, net: (got ? p.value : 0) - spent };
+}
+
+function simulate(n, p, beh) {
+  const brng = mulberry32(p.seed ^ 0x9e3779b9), out = { A: [], B: [] };
+  for (let i = 0; i < n; i++) {
+    const budget = p.value * Math.exp(gauss(brng) * 0.45);
+    for (const v of ["A", "B"]) out[v].push(play(v, p, beh, budget, mulberry32(p.seed * 1000003 + i)));
+  }
+  return out;
+}
+
+function summarize(rs, p) {
+  const n = rs.length, s = rs.map(r => r.spent).sort((a, b) => a - b);
+  const pct = f => 100 * rs.filter(f).length / n;
+  return [
+    ["평균 지출", rs.reduce((a, r) => a + r.spent, 0) / n, "won"],
+    ["지출 중앙값", s[n >> 1], "won"],
+    ["상위 10% 지출", s[Math.floor(n * 0.9)], "won"],
+    ["평균 뽑기 횟수", rs.reduce((a, r) => a + r.pulls, 0) / n, "x"],
+    ["픽업 획득률", pct(r => r.got), "%"],
+    ["손익분기점 초과 비율", pct(r => r.spent > p.value), "%"],
+    ["빈손 + 손익분기점 초과", pct(r => !r.got && r.spent > p.value), "%"],
+    ["심리적 예산 초과 비율", pct(r => r.spent > r.budget), "%"],
+    ["평균 순손익 (가치 − 지출)", rs.reduce((a, r) => a + r.net, 0) / n, "won"]
+  ];
+}
+
+const fmt = (v, u) => u === "won" ? won(v) : u === "%" ? v.toFixed(1) + "%" : v.toFixed(1) + "회";
+const fmtDiff = (v, u) => (v >= 0 ? "+" : "−") + fmt(Math.abs(v), u);
+
+// 지출이 늘면 나쁨(빨강), 획득률·순손익이 늘면 좋음(초록)
+const higherIsBetter = new Set(["픽업 획득률", "평균 순손익 (가치 − 지출)"]);
+
+function renderTable(sa, sb) {
+  $("simTable").innerHTML = `<thead><tr><th>지표</th><th class="a">A 명시</th><th class="b">B 미명시</th><th>차이 (B − A)</th></tr></thead><tbody>` +
+    sa.map((row, i) => {
+      const [k, va, u] = row, vb = sb[i][1], d = vb - va;
+      const bad = higherIsBetter.has(k) ? d < 0 : d > 0;
+      return `<tr><td>${k}</td><td>${fmt(va, u)}</td><td>${fmt(vb, u)}</td><td class="diff ${Math.abs(d) < 1e-9 ? "" : bad ? "up" : "down"}">${fmtDiff(d, u)}</td></tr>`;
+    }).join("") + `</tbody>`;
+}
+
+// 지출 분포 히스토그램 (A·B 같은 x축, 같은 y축)
+function renderCharts(res, p) {
+  const maxSpend = CFG.hard * 2 * p.cost, binW = 10 * p.cost, nb = Math.ceil(maxSpend / binW) + 1;
+  const bins = v => { const h = new Array(nb).fill(0); res[v].forEach(r => h[Math.min(nb - 1, Math.floor(r.spent / binW))]++); return h.map(c => 100 * c / res[v].length); };
+  const H = { A: bins("A"), B: bins("B") }, yMax = Math.ceil(Math.max(...H.A, ...H.B) / 5) * 5 || 5;
+  const W = 760, Ht = 170, L = 40, R = 12, T = 10, Bm = 26, pw = W - L - R, ph = Ht - T - Bm;
+  const x = s => L + s / (nb * binW) * pw, y = v => T + ph - v / yMax * ph;
+  const be = p.value;
+  $("charts").innerHTML = "";
+  for (const v of ["A", "B"]) {
+    const div = document.createElement("div");
+    div.className = "chart " + v.toLowerCase();
+    let g = "";
+    for (let t = 0; t <= yMax; t += yMax / 5) g += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--ink-3)" font-family="var(--f-mono)">${t}%</text>`;
+    const tickStep = 100000;
+    for (let s = 0; s <= nb * binW; s += tickStep) g += `<text x="${x(s)}" y="${Ht - 6}" text-anchor="middle" font-size="11" fill="var(--ink-3)" font-family="var(--f-mono)">${s === 0 ? "0" : (s / 10000) + "만"}</text>`;
+    const bw = pw / nb;
+    H[v].forEach((c, i) => {
+      if (c <= 0) return;
+      const top = y(c), hgt = Math.max(1, T + ph - top);
+      g += `<path d="M${x(i * binW) + 1},${T + ph} v${-(hgt - 2)} q0,-2 2,-2 h${bw - 6} q2,0 2,2 v${hgt - 2} z" fill="var(--tone)" />`;
+      g += `<rect x="${x(i * binW)}" y="${T}" width="${bw}" height="${ph}" fill="transparent" data-i="${i}" data-c="${c.toFixed(1)}"/>`;
+    });
+    g += `<line x1="${x(be)}" x2="${x(be)}" y1="${T - 4}" y2="${T + ph}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    g += `<text x="${x(be) + 5}" y="${T + 8}" font-size="11" fill="var(--bad)" font-weight="700">손익분기점</text>`;
+    g += `<line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" stroke="var(--ink-3)" stroke-width="1"/>`;
+    div.innerHTML = `<div class="ttl"><i></i>${v === "A" ? "A 손익분기점 명시" : "B 손익분기점 미명시"} · 총지출 분포 (플레이어 비율)</div><svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="${v} 총지출 분포">${g}</svg>`;
+    const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; div.appendChild(tip);
+    div.querySelector("svg").addEventListener("mousemove", e => {
+      const t = e.target.closest("rect[data-i]"); if (!t) { tip.hidden = true; return; }
+      const i = +t.dataset.i, box = div.getBoundingClientRect();
+      tip.textContent = `${won(i * binW)} ~ ${won((i + 1) * binW)} · ${t.dataset.c}%`;
+      tip.style.left = (e.clientX - box.left) + "px"; tip.style.top = (e.clientY - box.top) + "px"; tip.hidden = false;
+    });
+    div.querySelector("svg").addEventListener("mouseleave", () => tip.hidden = true);
+    $("charts").appendChild(div);
+  }
+}
+
+function renderFindings(sa, sb, p) {
+  const g = (s, k) => s.find(r => r[0] === k)[1];
+  const dSpend = g(sb, "평균 지출") - g(sa, "평균 지출");
+  const overA = g(sa, "손익분기점 초과 비율"), overB = g(sb, "손익분기점 초과 비율");
+  const gotA = g(sa, "픽업 획득률"), gotB = g(sb, "픽업 획득률");
+  const netA = g(sa, "평균 순손익 (가치 − 지출)"), netB = g(sb, "평균 순손익 (가치 − 지출)");
+  const expCost = E[0][0] * p.cost;
+  $("findings").innerHTML = `<h3>읽는 법</h3><ul>
+    <li>B 플레이어는 A보다 1인당 평균 <b class="num">${won(Math.abs(dSpend))}</b> ${dSpend >= 0 ? "더" : "덜"} 씁니다. 손익분기점을 넘긴 비율은 A ${overA.toFixed(1)}%, B ${overB.toFixed(1)}%입니다.</li>
+    <li>대신 B는 끝까지 가서 픽업을 얻는 경우가 많습니다(획득률 A ${gotA.toFixed(1)}%, B ${gotB.toFixed(1)}%). 픽업 기대 비용(${won(expCost)})이 가치(${won(p.value)})${expCost > p.value ? "보다 크기" : "보다 작기"} 때문에, 손익분기점에서 멈추는 A는 ${expCost > p.value ? "빈손으로 끝나는 경우가 많습니다" : "대부분 그 안에 획득합니다"}.</li>
+    <li>평균 순손익은 A ${won(netA)}, B ${won(netB)}입니다. ${expCost > p.value ? "기대 비용이 가치보다 큰 배너라면 손익분기점 정보만으로는 부족하고, 시작 전에 기대 비용을 함께 보여줘야 손실이 줄어듭니다." : "기대 비용이 가치보다 작은 배너에서는 정보 공개가 지출과 손실을 함께 줄입니다."}</li>
+  </ul>`;
+}
+
+function runSim() {
+  const p = params();
+  const beh = { perceive: Math.max(0.05, +$("sPerceive").value || 0.7), sunk: Math.max(0, +$("sSunk").value || 0), finish: 0.25 };
+  const n = Math.min(100000, Math.max(500, Math.trunc(+$("sN").value || 10000)));
+  $("perceiveTxt").textContent = Math.round(beh.perceive * 100) + "%";
+  $("sunkTxt").textContent = Math.round(beh.sunk * 100) + "%";
+  const res = simulate(n, p, beh), sa = summarize(res.A, p), sb = summarize(res.B, p);
+  renderTable(sa, sb); renderCharts(res, p); renderFindings(sa, sb, p);
+}
+
+// ---------- 연결 ----------
+buildPityBar("aPityBar");
+const A = makeMachine("a"), B = makeMachine("b");
+$("aPull1").onclick = () => A.pull(1); $("aPull10").onclick = () => A.pull(10); $("aReset").onclick = A.reset;
+$("bPull1").onclick = () => B.pull(1); $("bPull10").onclick = () => B.pull(10); $("bReset").onclick = B.reset;
+$("bothPull10").onclick = () => { A.pull(10); B.pull(10); };
+$("bothReset").onclick = () => { A.reset(); B.reset(); };
+$("runSim").onclick = runSim;
+for (const id of ["pValue", "pCost", "pSeed"]) $(id).addEventListener("change", () => { renderDerived(); A.reset(); B.reset(); runSim(); });
+
+renderDerived();
+A.reset(); B.reset();
+// 예시 상태: 양쪽 모두 40회 뽑은 상태로 시작
+A.pull(40); B.pull(40);
+runSim();
+})();
+</script>

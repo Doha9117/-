@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>버튼 누르기 과제</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+</head>
+<body>
+<div class="p-wrap">
+  <main class="stage" id="stage" aria-live="polite">
+    <p class="muted">불러오는 중…</p>
+  </main>
+</div>
+
+<script>
+(() => {
+"use strict";
+const { probAt, rewardAt, rand, won, pct, esc, errorText, api, demo, LS } = window.BX;
+const $ = id => document.getElementById(id);
+const stage = $("stage");
+const params = new URLSearchParams(location.search);
+// ?g=c 또는 ?g=control → 통제 집단, ?g=e 또는 ?g=experimental → 실험 집단, 없으면 서버가 균형 배정
+const forcedGroup = ({ c: "control", control: "control", e: "experimental", experimental: "experimental" })[(params.get("g") || params.get("group") || "").toLowerCase()] || null;
+const urlPid = (params.get("pid") || "").trim();
+
+let cfg = null;      // 서버에서 받은 실험 조건
+let run = null;      // 진행 중인 기록 (새로고침해도 이어지도록 localStorage에 보관)
+let busy = false;
+
+const demoBar = demo ? `<div class="demo-bar">데모 모드: 기록이 이 브라우저에만 저장됩니다. 연구자는 config.js에 서버 주소를 넣어 주세요.</div>` : "";
+const saveActive = () => LS.set("bx.active", run);
+const clearActive = () => { try { localStorage.removeItem("bx.active"); } catch (e) {} };
+
+// ---------- 1. 시작 ----------
+async function boot() {
+  await flushPending();
+  const active = LS.get("bx.active", null);
+  if (active && active.runId && !active.endReason) {   // 과제 도중 새로고침한 경우 이어서 진행
+    run = active; cfg = run.config; run._t0 = performance.now() - (run.elapsedMs || 0);
+    if (run.instructionMs != null) run._t1 = run._t0 + run.instructionMs;
+    return run.instructionMs == null ? renderInstructions() : renderPlay("과제를 이어서 진행합니다.");
+  }
+  const res = await api({ action: "config" });
+  if (!res.ok) return renderError(res.error, boot);
+  cfg = res.config;
+  document.title = cfg.title || document.title;
+  if (!cfg.open) return renderMessage("지금은 참여를 받고 있지 않습니다.", "연구자에게 문의해 주세요.");
+  const done = LS.get("bx.done", null);
+  if (done && !cfg.allowRepeat) return renderDone(done, true);
+  renderConsent();
+}
+
+function renderError(code, retry) {
+  stage.innerHTML = `${demoBar}<div class="warn">${esc(errorText(code))}</div><button class="primary wide" id="retry">다시 시도</button>`;
+  $("retry").onclick = retry;
+}
+function renderMessage(title, body) {
+  stage.innerHTML = `${demoBar}<h1>${esc(title)}</h1><p class="muted">${esc(body)}</p>`;
+}
+
+// ---------- 2. 동의 + 참가자 ID ----------
+function renderConsent(error = "") {
+  stage.innerHTML = `${demoBar}
+    <div class="eyebrow">연구 참여 안내</div>
+    <h1>${esc(cfg.title || "버튼 누르기 과제")}</h1>
+    <form class="card" id="consentForm" novalidate>
+      <p class="consent">${esc(cfg.consentText)}</p>
+      ${urlPid ? `<p class="small">참가자 ID: <b class="num">${esc(urlPid)}</b></p>`
+        : `<label class="field" for="pid">참가자 ID (연구자에게 받은 번호나 이름)<input id="pid" autocomplete="off" required maxlength="60"></label>`}
+      <label class="check" for="agree"><input type="checkbox" id="agree">위 내용을 읽었고 참여에 동의합니다.</label>
+      ${error ? `<div class="warn">${esc(error)}</div>` : ""}
+      <button class="primary wide" id="startBtn" type="submit">시작하기</button>
+    </form>`;
+  $("consentForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const pid = urlPid || $("pid").value.trim();
+    if (!pid) return renderConsent("참가자 ID를 입력해 주세요.");
+    if (!$("agree").checked) return renderConsent("동의 항목에 체크해 주세요.");
+    $("startBtn").disabled = true; $("startBtn").textContent = "준비 중…";
+    const res = await api({ action: "start", participantId: pid, group: forcedGroup, userAgent: navigator.userAgent });
+    if (!res.ok) return renderConsent(errorText(res.error));
+    cfg = res.config;
+    run = { runId: res.runId, participantId: pid, group: res.group, limit: res.limit, config: cfg, pot: 0, presses: [], instructionMs: null, endReason: null, elapsedMs: 0 };
+    run._t0 = performance.now();
+    saveActive();
+    renderInstructions();
+  });
+}
+
+// ---------- 3. 안내문 ----------
+function renderInstructions() {
+  const c = run.config, exp = run.group === "experimental";
+  const items = [
+    "화면 가운데 버튼을 누를 때마다 돈을 받을 기회가 생깁니다.",
+    "누를수록 성공 확률은 낮아지지만, 성공했을 때 받는 돈은 커집니다.",
+    `첫 번째 누름은 성공 확률 ${pct(c.p0)}, 성공 시 ${won(c.r0)}입니다. 한 번 누를 때마다 확률은 ${+(c.pStep * 100).toFixed(2)}%p 낮아지고 보상은 ${won(c.rStep)} 올라갑니다.`,
+    c.cost ? `버튼을 한 번 누를 때마다 ${won(c.cost)}이 차감됩니다.` : null,
+    c.failMode === "lose" ? "실패하면 그때까지 모은 돈을 모두 잃고 과제가 끝납니다." : "실패하면 그 회차에는 돈을 받지 못하지만 계속 누를 수 있습니다.",
+    "언제든 '그만하고 받기'를 누르면 모은 돈을 그대로 받습니다.",
+    exp ? `버튼은 최대 ${c.cap}번까지 누를 수 있습니다. ${c.cap}번을 모두 누르면 모은 돈을 받고 끝납니다.` : "버튼을 누를 수 있는 횟수에는 제한이 없습니다."
+  ].filter(Boolean);
+  stage.innerHTML = `${demoBar}
+    <div class="eyebrow">과제 안내</div>
+    <h1>버튼을 누르는 과제입니다</h1>
+    <div class="card"><ul>${items.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>
+    <button class="primary wide" id="beginBtn">이해했습니다. 시작</button>`;
+  $("beginBtn").onclick = () => {
+    run.instructionMs = Math.round(performance.now() - run._t0);
+    run._t1 = performance.now();
+    saveActive(); renderPlay();
+  };
+}
+
+// ---------- 4. 과제 ----------
+function renderPlay(flash = "", cls = "") {
+  const c = run.config, n = run.presses.length + 1, exp = run.group === "experimental";
+  const meta = [];
+  if (c.showProb) meta.push(`다음 성공 확률 <b>${pct(probAt(n, c))}</b>`);
+  if (c.showReward) meta.push(`다음 성공 보상 <b>${won(rewardAt(n, c))}</b>`);
+  if (exp && c.showRemain) meta.push(`남은 기회 <b>${run.limit - run.presses.length}</b> / ${c.cap}`);
+  meta.push(`누른 횟수 <b>${run.presses.length}</b>`);
+  stage.innerHTML = `${demoBar}
+    <div class="pot"><span class="k">지금까지 모은 돈</span><span class="v">${won(run.pot)}</span></div>
+    <div class="meta">${meta.map(m => `<span>${m}</span>`).join("")}</div>
+    <button class="bigbtn" id="pressBtn" aria-label="버튼 누르기">누르기</button>
+    <div class="flash ${cls}">${esc(flash)}</div>
+    <button class="wide" id="stopBtn">그만하고 ${won(run.pot)} 받기</button>`;
+  $("pressBtn").onclick = press;
+  $("stopBtn").onclick = () => finish("stop");
+}
+
+function elapsed() { return Math.round(performance.now() - (run._t1 ?? run._t0)); }
+
+function press() {
+  if (busy || run.endReason) return;
+  busy = true; setTimeout(() => { busy = false; }, 250);   // 연타 오입력 방지
+  const c = run.config, n = run.presses.length + 1, p = probAt(n, c), r = rewardAt(n, c), draw = rand();
+  const success = draw < p, potBefore = run.pot;
+  run.pot = success ? run.pot - c.cost + r : (c.failMode === "lose" ? 0 : run.pot - c.cost);
+  run.presses.push({ n, prob: +p.toFixed(6), reward: r, draw: +draw.toFixed(6), success, potBefore, potAfter: run.pot, ms: elapsed() });
+  run.elapsedMs = Math.round(performance.now() - run._t0);
+  saveActive();
+  if (!success && c.failMode === "lose") return finish("fail");
+  if (run.presses.length >= run.limit) return finish(run.group === "experimental" ? "cap" : "safety");
+  renderPlay(success ? `성공 +${won(r)}` : "실패", success ? "win" : "lose");
+}
+
+// ---------- 5. 종료와 저장 ----------
+async function finish(reason) {
+  run.endReason = reason;
+  run.totalMs = Math.round(performance.now() - run._t0);
+  const payload = { runId: run.runId, presses: run.presses, endReason: reason, instructionMs: run.instructionMs, totalMs: run.totalMs };
+  const done = { runId: run.runId, pot: run.pot, reason, cap: run.config.cap };
+  LS.set("bx.done", done);
+  queuePending(payload); clearActive();
+  renderDone(done, false);
+  await flushPending();
+  updateSaveStatus();
+}
+
+function queuePending(p) { const q = LS.get("bx.pending", []); q.push(p); LS.set("bx.pending", q); }
+async function flushPending() {
+  const q = LS.get("bx.pending", []), left = [];
+  for (const p of q) {
+    const res = await api({ action: "finish", run: p });
+    if (!res.ok && res.error === "network") left.push(p);
+  }
+  LS.set("bx.pending", left);
+  return left.length === 0;
+}
+function updateSaveStatus() {
+  const el = $("saveMsg"); if (!el) return;
+  const left = LS.get("bx.pending", []).length;
+  if (!left) { el.textContent = "결과가 저장되었습니다. 이제 창을 닫아도 됩니다."; return; }
+  el.innerHTML = `결과를 아직 보내지 못했습니다. 인터넷 연결을 확인한 뒤 다시 보내 주세요. <button id="resend">다시 보내기</button>`;
+  $("resend").onclick = async () => { el.textContent = "보내는 중…"; await flushPending(); updateSaveStatus(); };
+}
+
+function renderDone(done, revisit) {
+  const msg = {
+    stop: "그만두기를 선택했습니다.",
+    fail: "실패해서 모은 돈을 모두 잃었습니다.",
+    cap: `버튼을 누를 수 있는 기회 ${done.cap}번을 모두 사용했습니다.`,
+    safety: "과제가 끝났습니다."
+  }[done.reason] || "과제가 끝났습니다.";
+  stage.innerHTML = `${demoBar}
+    <div class="eyebrow">${revisit ? "이미 참여를 마쳤습니다" : "과제 종료"}</div>
+    ${revisit ? "" : `<p class="muted" style="font-size:17px">${esc(msg)}</p>`}
+    <div class="pot"><span class="k">받는 금액</span><span class="v">${won(done.pot)}</span></div>
+    <div style="display:grid;gap:6px;justify-items:center"><span class="small">완료 코드 (연구자에게 알려 주세요)</span><span class="code">${esc(done.runId.slice(0, 6).toUpperCase())}</span></div>
+    <p class="muted">참여해 주셔서 감사합니다.</p>
+    <p class="small" id="saveMsg" role="status">${revisit ? "" : "결과 저장 중…"}</p>`;
+  if (revisit) updateSaveStatus();
+}
+
+window.addEventListener("online", async () => { await flushPending(); updateSaveStatus(); });
+boot();
+})();
+</script>
+</body>
+</html>
