@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>버튼 실험 연구자 콘솔</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+</head>
+<body>
+<div class="a-wrap">
+  <div class="top">
+    <div style="display:grid;gap:6px">
+      <div class="eyebrow">위험 감수 행동 실험 · 연구자 콘솔</div>
+      <h1>버튼 누르기 실험</h1>
+    </div>
+    <div class="row"><span class="small" id="modeTxt"></span><button id="logout" hidden>로그아웃</button></div>
+  </div>
+
+  <!-- 로그인 -->
+  <form class="panel" id="login" style="max-width:440px" novalidate>
+    <h2>연구자 로그인</h2>
+    <label class="field" for="key">연구자 비밀번호 (Code.gs의 ADMIN_KEY)<input id="key" type="password" autocomplete="current-password"></label>
+    <div id="loginErr"></div>
+    <div class="row"><button class="primary" type="submit">들어가기</button></div>
+  </form>
+
+  <div id="app" hidden>
+    <nav class="tabs" role="tablist" aria-label="연구자 메뉴">
+      <button role="tab" id="tab-results" aria-selected="true" aria-controls="view-results">결과 <span class="num" id="countTxt"></span></button>
+      <button role="tab" id="tab-links" aria-selected="false" aria-controls="view-links">참가 링크</button>
+      <button role="tab" id="tab-settings" aria-selected="false" aria-controls="view-settings">설정</button>
+    </nav>
+
+    <section id="view-results" role="tabpanel" aria-labelledby="tab-results" class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2>집단 비교</h2>
+        <div class="row">
+          <button id="csvRuns">참가자별 CSV</button>
+          <button id="csvPresses">누름 기록 CSV</button>
+          <button id="reload">새로고침</button>
+        </div>
+      </div>
+      <p class="small" id="loadedAt"></p>
+      <div id="resultsBody"></div>
+    </section>
+
+    <section id="view-links" role="tabpanel" aria-labelledby="tab-links" class="panel" hidden>
+      <h2>참가자에게 보낼 링크</h2>
+      <p class="muted">참가자는 자기 휴대폰이나 컴퓨터에서 링크를 열고 참가자 ID를 입력한 뒤 과제를 합니다. 로그인은 필요 없습니다.</p>
+      <div id="links"></div>
+      <p class="note">링크 끝에 <code>&amp;pid=P001</code>을 붙이면 참가자 ID 입력 칸이 사라지고 그 ID로 기록됩니다. 참가자별 링크를 따로 보낼 때 쓰세요.</p>
+    </section>
+
+    <section id="view-settings" role="tabpanel" aria-labelledby="tab-settings" class="panel" hidden>
+      <h2>실험 조건</h2>
+      <p class="muted">두 집단은 확률·보상 규칙이 같고, 실험 집단만 누를 수 있는 횟수에 한계가 있습니다. 저장하면 이후에 시작하는 참가자부터 적용되고, 각 기록에는 그때의 조건이 함께 남습니다.</p>
+      <div class="grid2">
+        <div>
+          <h3>모집</h3>
+          <label class="check" for="sOpen"><input type="checkbox" id="sOpen">참여 받기 (끄면 새 참가자가 시작할 수 없음)</label>
+          <label class="check" for="sRepeat"><input type="checkbox" id="sRepeat">같은 참가자 ID·기기의 재참여 허용</label>
+          <label class="field" for="sTitle">과제 제목<input id="sTitle" maxlength="60"></label>
+        </div>
+        <div>
+          <h3>성공 확률</h3>
+          <label class="field" for="cP0">첫 번째 누름 성공 확률 (%)<input id="cP0" type="number" min="1" max="100" step="1"></label>
+          <label class="field" for="cPStep">누를 때마다 감소 (%p)<input id="cPStep" type="number" min="0" max="50" step="0.5"></label>
+          <label class="field" for="cPMin">최저 확률 (%)<input id="cPMin" type="number" min="0" max="100" step="0.5"></label>
+        </div>
+        <div>
+          <h3>보상</h3>
+          <label class="field" for="cR0">첫 번째 성공 보상 (원)<input id="cR0" type="number" min="0" step="10"></label>
+          <label class="field" for="cRStep">누를 때마다 증가 (원)<input id="cRStep" type="number" min="0" step="10"></label>
+          <label class="field" for="cCost">1회 누름 비용 (원, 0이면 없음)<input id="cCost" type="number" min="0" step="10"></label>
+        </div>
+        <div>
+          <h3>실패했을 때</h3>
+          <div class="seg" role="radiogroup" aria-label="실패 처리">
+            <label><input type="radio" name="fail" value="lose" id="fLose">모은 돈을 모두 잃고 종료</label>
+            <label><input type="radio" name="fail" value="miss" id="fMiss">그 회차만 0원, 계속</label>
+          </div>
+          <label class="field" for="cSafety">통제 집단 안전 상한 (참가자에게 비공개)<input id="cSafety" type="number" min="10" step="10"></label>
+        </div>
+        <div>
+          <h3>실험 집단</h3>
+          <label class="field" for="cCap">누를 수 있는 최대 횟수<input id="cCap" type="number" min="1" step="1"></label>
+          <h3>참가자에게 보여줄 정보</h3>
+          <label class="check" for="sProb"><input type="checkbox" id="sProb">다음 누름의 성공 확률</label>
+          <label class="check" for="sReward"><input type="checkbox" id="sReward">다음 누름의 성공 보상</label>
+          <label class="check" for="sRemain"><input type="checkbox" id="sRemain">남은 기회 (실험 집단)</label>
+        </div>
+        <div>
+          <h3>동의 안내문</h3>
+          <label class="field" for="sConsent">참가자가 시작 전에 읽는 글<textarea id="sConsent"></textarea></label>
+        </div>
+      </div>
+      <div id="settingsWarn"></div>
+      <div class="row"><button class="primary" id="saveSettings">조건 저장</button><button id="resetSettings">기본값 불러오기</button><span class="small" id="settingsMsg" role="status"></span></div>
+      <h3>회차별 확률과 보상</h3>
+      <div class="tablewrap"><table id="schedule" aria-label="누름 회차별 확률과 보상"></table></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const { DEFAULTS, probAt, rewardAt, won, pct, esc, errorText, api, demo, LS, mean, median, sd, welch, toCsv, download } = window.BX;
+const $ = id => document.getElementById(id);
+const GROUP = { control: "통제 집단", experimental: "실험 집단" };
+const REASON = { stop: "그만둠", fail: "실패", cap: "한계 도달", safety: "안전 상한" };
+const f1 = x => Number.isNaN(x) ? "–" : x.toFixed(1);
+
+let key = "", data = { runs: [], presses: [], config: { ...DEFAULTS } }, cfg = { ...DEFAULTS };
+
+$("modeTxt").textContent = demo ? "데모 모드 · 이 브라우저에만 기록" : "Google 스프레드시트에 기록 중";
+
+// ---------- 로그인 ----------
+async function login(k) {
+  const res = await api({ action: "ping", key: k });
+  if (!res.ok) { $("loginErr").innerHTML = `<div class="warn">${esc(errorText(res.error))}</div>`; return; }
+  key = k; try { sessionStorage.setItem("bx.key", k); } catch (e) {}
+  $("login").hidden = true; $("app").hidden = false; $("logout").hidden = false;
+  await load();
+}
+$("login").addEventListener("submit", e => { e.preventDefault(); login($("key").value); });
+$("logout").onclick = () => { try { sessionStorage.removeItem("bx.key"); } catch (e) {} location.reload(); };
+
+async function load() {
+  const res = await api({ action: "adminData", key });
+  if (!res.ok) { $("resultsBody").innerHTML = `<div class="warn">${esc(errorText(res.error))}</div>`; return; }
+  data = res;
+  data.runs.forEach(r => { r.presses = +r.presses || 0; r.earned = +r.earned || 0; r.limit = +r.limit || 0; });
+  cfg = { ...DEFAULTS, ...res.config };
+  $("loadedAt").textContent = `불러온 시각 ${new Date().toLocaleTimeString("ko-KR")}`;
+  $("countTxt").textContent = `(${data.runs.filter(r => r.status === "finished").length})`;
+  renderResults(); fillSettings(); renderLinks();
+}
+$("reload").onclick = load;
+
+// ---------- 탭 ----------
+const tabs = ["results", "links", "settings"];
+tabs.forEach(t => $("tab-" + t).addEventListener("click", () => {
+  tabs.forEach(u => { $("tab-" + u).setAttribute("aria-selected", u === t); $("view-" + u).hidden = u !== t; });
+}));
+
+// ---------- 결과 ----------
+let pendingDelete = null;
+function groupStats(g) {
+  const rs = data.runs.filter(r => r.group === g && r.status === "finished");
+  const share = k => rs.length ? rs.filter(r => r.end_reason === k).length / rs.length : NaN;
+  return { rs, n: rs.length, presses: rs.map(r => r.presses), earn: rs.map(r => r.earned), share,
+    dropped: data.runs.filter(r => r.group === g && r.status !== "finished").length };
+}
+function renderResults() {
+  const body = $("resultsBody");
+  if (!data.runs.length) {
+    body.innerHTML = `<div class="empty">아직 기록이 없습니다. '참가 링크' 탭의 링크를 참가자에게 보내면, 과제를 마친 사람부터 여기에 집단별 결과가 쌓입니다.</div>`;
+    return;
+  }
+  const S = { control: groupStats("control"), experimental: groupStats("experimental") };
+  const card = g => {
+    const s = S[g], capKey = g === "experimental" ? "cap" : "safety";
+    const sh = k => Number.isNaN(s.share(k)) ? "–" : pct(s.share(k));
+    return `<div class="gcard ${g}"><h3>${GROUP[g]} <span class="small">완료 ${s.n}명 · 진행 중/이탈 ${s.dropped}명</span></h3><div class="kv">
+      <span>평균 누른 횟수 (SD)</span><span>${f1(mean(s.presses))} (${f1(sd(s.presses))})</span>
+      <span>누른 횟수 중앙값</span><span>${f1(median(s.presses))}</span>
+      <span>평균 받은 금액</span><span>${s.n ? won(mean(s.earn)) : "–"}</span>
+      <span>스스로 그만둠</span><span>${sh("stop")}</span>
+      <span>실패로 종료</span><span>${sh("fail")}</span>
+      <span>${g === "experimental" ? "한계까지 누름" : "안전 상한 도달"}</span><span>${sh(capKey)}</span>
+    </div></div>`;
+  };
+  const w = welch(S.experimental.presses, S.control.presses);
+  const test = w ? `누른 횟수 차이 (실험 − 통제) = ${f1(mean(S.experimental.presses) - mean(S.control.presses))}회, Welch t(${w.df.toFixed(1)}) = ${w.t.toFixed(2)}, p ${w.p < 0.001 ? "< .001" : "= " + w.p.toFixed(3)}`
+    : "집단마다 완료자가 2명 이상 모이면 누른 횟수 차이 검정(Welch t)을 보여줍니다.";
+  const cfgs = new Set(data.runs.filter(r => r.status === "finished").map(r => r.config_json));
+  body.innerHTML = `<div class="summary">${card("control")}${card("experimental")}</div>
+    <p class="note">${test}${cfgs.size > 1 ? "<br>주의: 조건이 다른 기록이 섞여 있습니다. CSV의 cfg_ 열로 걸러서 분석하세요." : ""}</p>
+    <div class="chart"><div class="row" style="justify-content:space-between"><h3>누른 횟수 분포 (완료자)</h3><div class="legend"><span><i style="background:var(--ctrl)"></i>통제 집단</span><span><i style="background:var(--exp)"></i>실험 집단</span></div></div>${chart(S)}</div>
+    <h3>참가자별 기록</h3>
+    <div class="tablewrap"><table><thead><tr><th>참가자</th><th>완료 코드</th><th>집단</th><th>누른 횟수</th><th>받은 금액</th><th>종료</th><th>시작 시각</th><th></th></tr></thead><tbody>
+    ${[...data.runs].reverse().map(r => `<tr class="${r.status === "finished" ? "" : "status-started"}"><td class="txt">${esc(r.participant_id)}</td><td>${esc(String(r.run_id).slice(0, 6).toUpperCase())}</td><td class="txt"><span class="gpill ${esc(r.group)}">${GROUP[r.group] || esc(r.group)}</span></td><td>${r.status === "finished" ? r.presses : "–"}</td><td>${r.status === "finished" ? won(r.earned) : "–"}</td><td class="txt">${r.status === "finished" ? (REASON[r.end_reason] || esc(r.end_reason)) : "진행 중/이탈"}</td><td>${esc(new Date(r.started_at).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }))}</td><td><button class="danger" data-del="${esc(r.run_id)}" style="padding:4px 10px;font-size:12.5px">${pendingDelete === String(r.run_id) ? "정말 삭제" : "삭제"}</button></td></tr>`).join("")}
+    </tbody></table></div>`;
+  body.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.del;
+    if (pendingDelete !== id) { pendingDelete = id; renderResults(); return; }
+    pendingDelete = null; b.disabled = true;
+    const res = await api({ action: "deleteRun", key, runId: id });
+    if (!res.ok) alertBox(errorText(res.error));
+    load();
+  });
+}
+function alertBox(t) { $("resultsBody").insertAdjacentHTML("afterbegin", `<div class="warn">${esc(t)}</div>`); }
+
+function chart(S) {
+  const all = [...S.control.presses, ...S.experimental.presses];
+  if (!all.length) return `<div class="empty">완료한 참가자가 아직 없습니다.</div>`;
+  const maxN = Math.max(1, ...all), W = 760, H = 190, L = 40, R = 10, T = 14, B = 28, pw = W - L - R, ph = H - T - B;
+  const cnt = g => { const h = new Array(maxN + 1).fill(0); S[g].presses.forEach(v => h[v]++); return h.map(c => S[g].n ? c / S[g].n : 0); };
+  const hc = cnt("control"), he = cnt("experimental"), yMax = Math.max(0.05, ...hc, ...he);
+  const step = yMax > 0.5 ? 0.2 : yMax > 0.2 ? 0.1 : 0.05, top = Math.ceil(yMax / step - 1e-9) * step;
+  const slot = pw / (maxN + 1), bw = Math.max(2, (slot - 4) / 2), y = v => T + ph - v / top * ph;
+  let g = "";
+  for (let v = 0; v <= top + 1e-9; v += step) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--ink-3)" font-family="var(--f-mono)">${Math.round(v * 100)}%</text>`;
+  const every = Math.ceil((maxN + 1) / 20);
+  for (let i = 0; i <= maxN; i++) {
+    const x0 = L + i * slot + 2;
+    [[hc[i], "var(--ctrl)", "통제"], [he[i], "var(--exp)", "실험"]].forEach(([v, col, nm], k) => {
+      if (v > 0) g += `<rect x="${x0 + k * bw}" y="${y(v)}" width="${bw - 1}" height="${T + ph - y(v)}" rx="2" fill="${col}"><title>${nm} 집단 · ${i}회 · ${pct(v)}</title></rect>`;
+    });
+    if (i % every === 0) g += `<text x="${x0 + bw}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--ink-3)" font-family="var(--f-mono)">${i}</text>`;
+  }
+  const cap = S.experimental.rs.length ? S.experimental.rs[S.experimental.rs.length - 1].limit : null;
+  if (cap && cap <= maxN) { const xc = L + (cap + 1) * slot; g += `<line x1="${xc}" x2="${xc}" y1="${T}" y2="${T + ph}" stroke="var(--exp)" stroke-dasharray="4 3" stroke-width="1.5"/><text x="${xc - 4}" y="${T + 10}" text-anchor="end" font-size="11" fill="var(--exp)" font-weight="700">실험 한계 ${cap}회</text>`; }
+  g += `<line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" stroke="var(--ink-3)"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="집단별 누른 횟수 분포">${g}</svg><p class="small">가로축: 누른 횟수, 세로축: 집단 안 완료자 비율</p>`;
+}
+
+// ---------- CSV ----------
+const cfgCols = ["p0", "pStep", "pMin", "r0", "rStep", "cost", "failMode", "cap", "safety", "showProb", "showReward", "showRemain"];
+const stamp = () => new Date().toISOString().slice(0, 10);
+$("csvRuns").onclick = () => {
+  const rows = data.runs.map(r => { let c = {}; try { c = JSON.parse(r.config_json || "{}"); } catch (e) {} const o = { ...r, completion_code: String(r.run_id).slice(0, 6).toUpperCase() }; cfgCols.forEach(k => o["cfg_" + k] = c[k]); return o; });
+  download(`button_experiment_runs_${stamp()}.csv`, toCsv(rows, ["run_id", "completion_code", "participant_id", "group", "assignment", "limit", "status", "presses", "earned", "end_reason", "started_at", "ended_at", "instruction_ms", "total_ms", "user_agent", ...cfgCols.map(k => "cfg_" + k)]));
+};
+$("csvPresses").onclick = () => download(`button_experiment_presses_${stamp()}.csv`, toCsv(data.presses, ["run_id", "participant_id", "group", "press_no", "prob", "reward", "draw", "success", "pot_before", "pot_after", "ms_since_start"]));
+
+// ---------- 참가 링크 ----------
+function renderLinks() {
+  const base = new URL("index.html", location.href).href;
+  const rows = [
+    ["균형 무작위 배정 (추천)", base, "한 링크를 모두에게 보냅니다. 시작한 인원이 적은 집단에 배정하고, 같으면 무작위로 정합니다."],
+    ["통제 집단 전용", base + "?g=c", "이 링크로 들어온 참가자는 모두 통제 집단(횟수 제한 없음)입니다."],
+    ["실험 집단 전용", base + "?g=e", `이 링크로 들어온 참가자는 모두 실험 집단(최대 ${cfg.cap}회)입니다.`]
+  ];
+  $("links").innerHTML = rows.map(([t, u, d], i) => `<div class="linkrow"><h3>${t}</h3><code id="lk${i}">${esc(u)}</code><div class="row"><button data-copy="lk${i}">복사</button><a href="${esc(u)}" target="_blank" rel="noopener">새 창에서 열기</a></div><p class="small">${d}</p></div>`).join("");
+  $("links").querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => {
+    const el = $(b.dataset.copy);
+    try { await navigator.clipboard.writeText(el.textContent); b.textContent = "복사했습니다"; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "선택했습니다. 복사하세요"; }
+    setTimeout(() => b.textContent = "복사", 1800);
+  });
+}
+
+// ---------- 설정 ----------
+const F = { cP0: ["p0", 100], cPStep: ["pStep", 100], cPMin: ["pMin", 100], cR0: ["r0", 1], cRStep: ["rStep", 1], cCost: ["cost", 1], cCap: ["cap", 1], cSafety: ["safety", 1] };
+function fillSettings(c = cfg) {
+  for (const [id, [k, m]] of Object.entries(F)) $(id).value = +(c[k] * m).toFixed(4);
+  $(c.failMode === "miss" ? "fMiss" : "fLose").checked = true;
+  $("sProb").checked = c.showProb; $("sReward").checked = c.showReward; $("sRemain").checked = c.showRemain;
+  $("sOpen").checked = c.open; $("sRepeat").checked = c.allowRepeat;
+  $("sTitle").value = c.title; $("sConsent").value = c.consentText;
+  onSettingsInput();
+}
+function readSettings() {
+  const c = { ...cfg };
+  for (const [id, [k, m]] of Object.entries(F)) { const v = parseFloat($(id).value); if (!Number.isNaN(v)) c[k] = v / m; }
+  c.p0 = Math.min(1, Math.max(0, c.p0)); c.pMin = Math.min(c.p0, Math.max(0, c.pMin)); c.pStep = Math.max(0, c.pStep);
+  c.r0 = Math.max(0, c.r0); c.rStep = Math.max(0, c.rStep); c.cost = Math.max(0, c.cost);
+  c.cap = Math.max(1, Math.round(c.cap)); c.safety = Math.max(c.cap, Math.round(c.safety));
+  c.failMode = $("fMiss").checked ? "miss" : "lose";
+  c.showProb = $("sProb").checked; c.showReward = $("sReward").checked; c.showRemain = $("sRemain").checked;
+  c.open = $("sOpen").checked; c.allowRepeat = $("sRepeat").checked;
+  c.title = $("sTitle").value.trim() || DEFAULTS.title; c.consentText = $("sConsent").value.trim() || DEFAULTS.consentText;
+  return c;
+}
+function onSettingsInput() {
+  const c = readSettings(), w = [];
+  if (c.failMode === "miss" && c.cost === 0) w.push("실패해도 잃는 것이 없고 누름 비용도 0원이면, 통제 집단은 안전 상한까지 계속 누르는 것이 항상 이득입니다. 누름 비용을 두거나 '모은 돈을 모두 잃고 종료'를 쓰세요.");
+  if (!c.open) w.push("참여 받기가 꺼져 있습니다. 저장하면 새 참가자는 시작할 수 없습니다.");
+  $("settingsWarn").innerHTML = w.map(t => `<div class="warn">${t}</div>`).join("");
+  renderSchedule(c);
+}
+document.querySelectorAll("#view-settings input, #view-settings textarea").forEach(el => el.addEventListener("input", onSettingsInput));
+$("saveSettings").onclick = async () => {
+  $("settingsMsg").textContent = "저장 중…";
+  const res = await api({ action: "saveConfig", key, config: readSettings() });
+  if (!res.ok) { $("settingsMsg").textContent = errorText(res.error); return; }
+  cfg = { ...DEFAULTS, ...res.config }; renderLinks();
+  $("settingsMsg").textContent = "저장했습니다. 이후 시작하는 참가자부터 적용됩니다.";
+};
+$("resetSettings").onclick = () => { fillSettings({ ...DEFAULTS }); $("settingsMsg").textContent = "기본값을 불러왔습니다. 조건 저장을 눌러야 적용됩니다."; };
+
+function renderSchedule(c) {
+  let rows = "", surv = 1, pot = 0;
+  const show = Math.min(Math.max(c.cap + 5, 15), c.safety);
+  for (let n = 1; n <= show; n++) {
+    const p = probAt(n, c), r = rewardAt(n, c), before = pot;
+    surv *= p; pot += r - c.cost;
+    // 이 회차를 누를 때의 기대 이득 (계속 성공해 왔다고 가정)
+    const ev = c.failMode === "lose" ? p * pot - before : p * r - c.cost;
+    rows += `<tr class="${n === c.cap ? "capline" : ""}"><td>${n}${n === c.cap ? ' <span class="gpill experimental">실험 한계</span>' : ""}</td><td>${pct(p)}</td><td>${won(r)}</td><td>${won(pot)}</td>${c.failMode === "lose" ? `<td>${pct(surv)}</td>` : ""}<td style="color:${ev >= 0 ? "var(--good)" : "var(--bad)"}">${ev >= 0 ? "+" : ""}${won(ev)}</td></tr>`;
+  }
+  $("schedule").innerHTML = `<thead><tr><th>회차</th><th>성공 확률</th><th>성공 보상</th><th>연속 성공 시 누적</th>${c.failMode === "lose" ? "<th>여기까지 생존</th>" : ""}<th>이 회차 기대 이득</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+// ---------- 시작 ----------
+let saved = ""; try { saved = sessionStorage.getItem("bx.key") || ""; } catch (e) {}
+if (saved) login(saved);
+else if (demo) { $("key").value = "demo"; $("loginErr").innerHTML = `<div class="note">데모 모드에서는 아무 비밀번호나 들어갈 수 있습니다.</div>`; }
+})();
+</script>
+</body>
+</html>
